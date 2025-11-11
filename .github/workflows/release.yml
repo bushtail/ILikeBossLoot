@@ -55,15 +55,15 @@ jobs:
           echo "AUTHOR=$AUTHOR" >> $GITHUB_ENV
           echo "Detected author: $AUTHOR"
 
-      # Package mod, excluding unwanted files
-      - name: Package mod
+      # Output mod folder directly (no zip)
+      - name: Prepare mod folder
         run: |
           OUTDIR=$(find . -type d -path "*/bin/Release*" | head -n 1)
           if [ -z "$OUTDIR" ]; then
             echo "No Release output folder found" && exit 1
           fi
 
-          echo "Packaging to SPT/user/mods/$AUTHOR-$MOD_NAME/"
+          echo "Preparing folder SPT/user/mods/$AUTHOR-$MOD_NAME/"
           mkdir -p package/SPT/user/mods/$AUTHOR-$MOD_NAME
 
           rsync -av \
@@ -72,15 +72,11 @@ jobs:
             --exclude "*$MOD_NAME.staticwebassets.endpoints.json" \
             "$OUTDIR"/ package/SPT/user/mods/$AUTHOR-$MOD_NAME/
 
-          cd package
-          zip -r "../${MOD_NAME}_v${VERSION}.zip" .
-          ls -lh ../${MOD_NAME}_v${VERSION}.zip
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mod_package
-          path: "${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip"
+          name: v
+          path: package/SPT/user/mods/${{ env.AUTHOR }}-${{ env.MOD_NAME }}/
 
   release:
     runs-on: ubuntu-latest
@@ -92,7 +88,7 @@ jobs:
       - name: Download package artifact
         uses: actions/download-artifact@v4
         with:
-          name: mod_package
+          name: v
           path: .
 
       - name: Check for existing release
@@ -112,9 +108,9 @@ jobs:
         if: env.SKIP_RELEASE == 'false'
         uses: softprops/action-gh-release@v1
         with:
-          files: "${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip"
+          files: "SPT/user/mods/${{ env.AUTHOR }}-${{ env.MOD_NAME }}/**"
           tag_name: "v${{ env.VERSION }}"
-          name: "${{ env.MOD_NAME }} v${{ env.VERSION }}"
+          name: "v"
           body: "Author: ${{ env.AUTHOR }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
