@@ -1,4 +1,4 @@
-﻿name: Build and Release SPT Mod
+﻿﻿name: Build and Release SPT Mod
 
 on:
   push:
@@ -57,13 +57,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-  
+
       - name: Download mod artifact
         uses: actions/download-artifact@v4
         with:
           name: mod_package
           path: release_artifact
-  
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v1
         with:
