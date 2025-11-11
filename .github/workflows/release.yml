@@ -2,11 +2,11 @@
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]   # runs automatically on pushes to main
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,28 +22,31 @@ jobs:
       - name: Build project
         run: dotnet build -c Release
 
-      # Reflection: find any class extending AbstractModMetadata
-      - name: Extract ModMetadata
-        shell: pwsh
+      # Find the .cs file containing a class that extends AbstractModMetadata
+      - name: Locate metadata class file
         run: |
-          $dll = Get-ChildItem -Recurse -Filter *.dll | Where-Object { $_.FullName -match "bin\\Release" } | Select-Object -First 1
-          if (-not $dll) { throw "No DLL found under bin/Release" }
-          $asm = [System.Reflection.Assembly]::LoadFrom($dll.FullName)
-          $type = $asm.GetTypes() | Where-Object { $_.BaseType -and $_.BaseType.Name -eq "AbstractModMetadata" }
-          if (-not $type) { throw "No class extending AbstractModMetadata found in $($dll.FullName)" }
-          $instance = [Activator]::CreateInstance($type)
-          echo "MOD_NAME=$($instance.Name)" >> $env:GITHUB_ENV
-          echo "AUTHOR=$($instance.Author)" >> $env:GITHUB_ENV
-          echo "VERSION=$($instance.Version.ToString())" >> $env:GITHUB_ENV
-          echo "DLL_NAME=$($dll.Name)" >> $env:GITHUB_ENV
-          echo "DLL_PATH=$($dll.DirectoryName)" >> $env:GITHUB_ENV
+          FILE=$(grep -rl "class .*: AbstractModMetadata" . --include \*.cs | head -n 1)
+          if [ -z "$FILE" ]; then
+            echo "No class extending AbstractModMetadata found" && exit 1
+          fi
+          echo "METADATA_FILE=$FILE" >> $GITHUB_ENV
+
+      # Extract Name, Author, Version from that class block
+      - name: Extract metadata values
+        run: |
+          NAME=$(grep -Po 'Name\s*{.*?=\s*"(.*?)"' "$METADATA_FILE" | sed -E 's/.*"(.*)".*/\1/' | head -n 1)
+          AUTHOR=$(grep -Po 'Author\s*{.*?=\s*"(.*?)"' "$METADATA_FILE" | sed -E 's/.*"(.*)".*/\1/' | head -n 1)
+          VERSION=$(grep -Po 'Version\s*{.*?=\s*new\(.*?([0-9]+\.[0-9]+\.[0-9]+).*?\)' "$METADATA_FILE" | sed -E 's/.*([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -n 1)
+
+          echo "MOD_NAME=$NAME" >> $GITHUB_ENV
+          echo "AUTHOR=$AUTHOR" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       # Package into SPT/user/mods/<ModName>/
       - name: Package mod
-        shell: bash
         run: |
           mkdir -p package/SPT/user/mods/${MOD_NAME}
-          cp -r "${DLL_PATH}"/* package/SPT/user/mods/${MOD_NAME}/
+          cp -r $(find . -path "*/bin/Release/*" -type d | head -n 1)/* package/SPT/user/mods/${MOD_NAME}/
           cd package
           zip -r "../${MOD_NAME}_v${VERSION}.zip" .
 
@@ -58,7 +61,7 @@ jobs:
     needs: build
     steps:
       - name: Download package artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: mod_package
           path: .
