@@ -28,7 +28,7 @@ jobs:
       - name: Build project
         run: dotnet build -c Release
 
-      # Extract mod name
+      # Extract mod name (DLL filename)
       - name: Extract mod name
         id: extract_mod_name
         run: |
@@ -37,8 +37,8 @@ jobs:
             echo "No DLL found" && exit 1
           fi
           MOD=$(basename "$DLL" .dll)
-          echo "MOD_NAME=$MOD" >> $GITHUB_ENV
           echo "MOD_NAME=$MOD" >> $GITHUB_OUTPUT
+          echo "Detected mod name: $MOD"
 
       # Extract version from csproj
       - name: Extract version
@@ -49,10 +49,10 @@ jobs:
           if [ -z "$VERSION" ]; then
             echo "Could not determine version" && exit 1
           fi
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
 
-      # Extract author
+      # Extract author property
       - name: Extract author
         id: extract_author
         run: |
@@ -61,23 +61,30 @@ jobs:
           if [ -z "$AUTHOR" ]; then
             echo "Could not determine author" && exit 1
           fi
-          echo "AUTHOR=$AUTHOR" >> $GITHUB_ENV
           echo "AUTHOR=$AUTHOR" >> $GITHUB_OUTPUT
+          echo "Detected author: $AUTHOR"
 
       - name: Package mod
         run: |
-          OUTDIR=$(find . -type d -path "*/bin/Release*" | head -n 1)
+          MOD_NAME="${{ steps.extract_mod_name.outputs.MOD_NAME }}"
+          VERSION="${{ steps.extract_version.outputs.VERSION }}"
+          AUTHOR="${{ steps.extract_author.outputs.AUTHOR }}"
 
-          mkdir -p package/SPT/user/mods/${{ steps.extract_author.outputs.AUTHOR }}-${{ steps.extract_mod_name.outputs.MOD_NAME }}
+          OUTDIR=$(find . -type d -path "*/bin/Release*" | head -n 1)
+          if [ -z "$OUTDIR" ]; then
+            echo "No Release output folder found" && exit 1
+          fi
+
+          mkdir -p "package/SPT/user/mods/$AUTHOR-$MOD_NAME"
 
           rsync -av \
-            --exclude "*${{ steps.extract_mod_name.outputs.MOD_NAME }}.deps.json" \
-            --exclude "*${{ steps.extract_mod_name.outputs.MOD_NAME }}.pdb" \
-            --exclude "*${{ steps.extract_mod_name.outputs.MOD_NAME }}.staticwebassets.endpoints.json" \
-            "$OUTDIR"/ package/SPT/user/mods/${{ steps.extract_author.outputs.AUTHOR }}-${{ steps.extract_mod_name.outputs.MOD_NAME }}/
+            --exclude "*${MOD_NAME}.deps.json" \
+            --exclude "*${MOD_NAME}.pdb" \
+            --exclude "*${MOD_NAME}.staticwebassets.endpoints.json" \
+            "$OUTDIR"/ "package/SPT/user/mods/$AUTHOR-$MOD_NAME/"
 
           cd package
-          zip -r "../${{ steps.extract_mod_name.outputs.MOD_NAME }}_v${{ steps.extract_version.outputs.VERSION }}.zip" .
+          zip -r "../${MOD_NAME}_v${VERSION}.zip" .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
