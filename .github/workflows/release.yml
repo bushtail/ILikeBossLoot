@@ -34,7 +34,7 @@ jobs:
           echo "MOD_NAME=$MOD_NAME" >> $GITHUB_ENV
           echo "Detected mod name: $MOD_NAME"
 
-      # Extract version from csproj <Version>
+      # Extract version from csproj <Version> (Semantic Versioning)
       - name: Extract version
         run: |
           VERSION=$(grep -rPo '<Version>(.*?)</Version>' **/*.csproj | sed -E 's/.*>(.*)<.*/\1/' | head -n 1)
@@ -44,11 +44,10 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Detected version: $VERSION"
 
-      # Recursively scan .cs files for Author property
+      # Recursively scan .cs files for Author property (capture only the quoted value)
       - name: Extract author
         run: |
-          AUTHOR=$(grep -rPo 'public\s+override\s+string\s+Author\s*{\s*get;\s*init;\s*}\s*=\s*"(.*?)"' . --include \*.cs \
-            | sed -E 's/.*="([^"]+)".*/\1/' | head -n 1)
+          AUTHOR=$(grep -rPho -h 'public\s+override\s+string\s+Author\s*{\s*get;\s*init;\s*}\s*=\s*"\K[^"]+' . --include \*.cs | head -n 1)
           if [ -z "$AUTHOR" ]; then
             echo "Could not determine author" && exit 1
           fi
@@ -89,7 +88,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: v
-          path: .
+          path: artifact
 
       - name: Check for existing release
         id: check_release
@@ -108,7 +107,7 @@ jobs:
         if: env.SKIP_RELEASE == 'false'
         uses: softprops/action-gh-release@v1
         with:
-          files: "SPT/user/mods/${{ env.AUTHOR }}-${{ env.MOD_NAME }}/**"
+          files: "artifact/**"
           tag_name: "v${{ env.VERSION }}"
           name: "v"
           body: "Author: ${{ env.AUTHOR }}"
