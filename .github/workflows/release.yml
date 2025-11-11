@@ -23,8 +23,8 @@ jobs:
       - name: Build project
         run: dotnet build -c Release
 
-      # Extract ModGuid, Name, Author from .cs files
-      - name: Extract metadata from source
+      # Extract metadata from .cs files
+      - name: Extract metadata
         run: |
           MODGUID=$(grep -rPho -h 'public\s+override\s+string\s+ModGuid\s*{[^}]*}\s*=\s*"\K[^"]+' . --include \*.cs | head -n 1)
           NAME=$(grep -rPho -h 'public\s+override\s+string\s+Name\s*{[^}]*}\s*=\s*"\K[^"]+' . --include \*.cs | head -n 1)
@@ -42,7 +42,7 @@ jobs:
           echo "Detected Name: $NAME"
           echo "Detected Author: $AUTHOR"
 
-      # Extract version from assembly (Semantic Versioning)
+      # Extract version from assembly
       - name: Extract version from assembly
         run: |
           DLL=$(find . -type f -path "*/bin/Release*/*.dll" | head -n 1)
@@ -52,7 +52,7 @@ jobs:
 
           VERSION=$(dotnet exec --runtimeconfig "$DLL.runtimeconfig.json" --depsfile "$DLL.deps.json" "$DLL" --version 2>/dev/null || echo "")
           if [ -z "$VERSION" ]; then
-            VERSION=$(basename "$DLL" .dll | sed -E 's/.*\.//')
+            VERSION=$(grep -rPho -h 'public\s+override\s+Version\s*{[^}]*}\s*=\s*new\(typeof\(.*\)\.Assembly\.GetName\(\)\.Version\?\.ToString\(3\)\)' . --include \*.cs | head -n 1)
           fi
 
           if [ -z "$VERSION" ]; then
