@@ -68,7 +68,7 @@ jobs:
         with:
           files: "${{ needs.build.outputs.author }}-${{ needs.build.outputs.name }}_v${{ needs.build.outputs.version }}.zip"
           tag_name: "v${{ needs.build.outputs.version }}"
-          name: "${{ needs.build.outputs.author }}-${{ needs.build.outputs.name }} v${{ needs.build.outputs.version }}"
+          name: "v${{ needs.build.outputs.version }}"
           body: |
             ModGuid: ${{ needs.build.outputs.guid }}
             Author: ${{ needs.build.outputs.author }}
