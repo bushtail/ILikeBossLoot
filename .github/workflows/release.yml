@@ -23,42 +23,26 @@ jobs:
       - name: Build project
         run: dotnet build -c Release
 
-      # Extract version from assembly or csproj
-      - name: Extract version
+      # Extract mod name from DLL filename
+      - name: Extract mod name
         run: |
           DLL=$(find . -type f -path "*/bin/Release*/*.dll" | head -n 1)
           if [ -z "$DLL" ]; then
             echo "No DLL found in Release output" && exit 1
           fi
+          MOD_NAME=$(basename "$DLL" .dll)
+          echo "MOD_NAME=$MOD_NAME" >> $GITHUB_ENV
+          echo "Detected mod name: $MOD_NAME"
 
-          # Try to read informational version (SemVer) from assembly
-          VERSION=$(dotnet exec "$DLL" --version 2>/dev/null || echo "")
-
-          # Fallback: read <Version> from csproj
-          if [ -z "$VERSION" ]; then
-            VERSION=$(grep -Po '<Version>(.*?)</Version>' **/*.csproj | sed -E 's/.*>(.*)<.*/\1/' | head -n 1)
-          fi
-
+      # Extract version from assembly informational version or csproj
+      - name: Extract version
+        run: |
+          VERSION=$(grep -Po '<Version>(.*?)</Version>' **/*.csproj | sed -E 's/.*>(.*)<.*/\1/' | head -n 1)
           if [ -z "$VERSION" ]; then
             echo "Could not determine version" && exit 1
           fi
-
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Detected version: $VERSION"
-
-      # Extract mod name from metadata record/class
-      - name: Extract mod name
-        run: |
-          FILE=$(grep -rlE "(class|record)\s+\w+\s*:\s*AbstractModMetadata" . --include \*.cs | head -n 1)
-          if [ -z "$FILE" ]; then
-            echo "No metadata type found" && exit 1
-          fi
-          NAME=$(grep -Po 'Name\s*=>\s*"(.*?)"' "$FILE" | sed -E 's/.*"(.*)".*/\1/' | head -n 1)
-          if [ -z "$NAME" ]; then
-            echo "Could not determine mod name" && exit 1
-          fi
-          echo "MOD_NAME=$NAME" >> $GITHUB_ENV
-          echo "Detected mod name: $NAME"
 
       # Package mod, excluding unwanted files
       - name: Package mod
