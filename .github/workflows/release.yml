@@ -2,7 +2,8 @@
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master ]   # runs automatically on pushes to master
+  workflow_dispatch:        # allows manual trigger from Actions tab
 
 jobs:
   build:
@@ -22,47 +23,60 @@ jobs:
       - name: Build project
         run: dotnet build -c Release
 
-      - name: Locate metadata type file
+      # Extract version from assembly or csproj
+      - name: Extract version
+        run: |
+          DLL=$(find . -type f -path "*/bin/Release*/*.dll" | head -n 1)
+          if [ -z "$DLL" ]; then
+            echo "No DLL found in Release output" && exit 1
+          fi
+
+          # Try to read informational version (SemVer) from assembly
+          VERSION=$(dotnet exec "$DLL" --version 2>/dev/null || echo "")
+
+          # Fallback: read <Version> from csproj
+          if [ -z "$VERSION" ]; then
+            VERSION=$(grep -Po '<Version>(.*?)</Version>' **/*.csproj | sed -E 's/.*>(.*)<.*/\1/' | head -n 1)
+          fi
+
+          if [ -z "$VERSION" ]; then
+            echo "Could not determine version" && exit 1
+          fi
+
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Detected version: $VERSION"
+
+      # Extract mod name from metadata record/class
+      - name: Extract mod name
         run: |
           FILE=$(grep -rlE "(class|record)\s+\w+\s*:\s*AbstractModMetadata" . --include \*.cs | head -n 1)
           if [ -z "$FILE" ]; then
-            echo "No type extending AbstractModMetadata found" && exit 1
+            echo "No metadata type found" && exit 1
           fi
-          echo "METADATA_FILE=$FILE" >> $GITHUB_ENV
-
-      - name: Extract metadata values
-        run: |
-          NAME=$(grep -Po 'Name\s*=>\s*"(.*?)"' "$METADATA_FILE" | sed -E 's/.*"(.*)".*/\1/' | head -n 1)
-          AUTHOR=$(grep -Po 'Author\s*=>\s*"(.*?)"' "$METADATA_FILE" | sed -E 's/.*"(.*)".*/\1/' | head -n 1)
-          VERSION=$(grep -Po 'Version\s*=>\s*new\s*(Version)?\s*\(\s*([0-9]+\s*,\s*[0-9]+\s*,\s*[0-9]+)\s*\)' "$METADATA_FILE" \
-            | sed -E 's/.*\(([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\).*/\1.\2.\3/' | head -n 1)
-          
+          NAME=$(grep -Po 'Name\s*=>\s*"(.*?)"' "$FILE" | sed -E 's/.*"(.*)".*/\1/' | head -n 1)
+          if [ -z "$NAME" ]; then
+            echo "Could not determine mod name" && exit 1
+          fi
           echo "MOD_NAME=$NAME" >> $GITHUB_ENV
-          echo "AUTHOR=$AUTHOR" >> $GITHUB_ENV
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          
-      - name: Debug metadata values
-        run: |
-          echo "MOD_NAME=${{ env.MOD_NAME }}"
-          echo "AUTHOR=${{ env.AUTHOR }}"
-          echo "VERSION=${{ env.VERSION }}"
+          echo "Detected mod name: $NAME"
 
+      # Package mod, excluding unwanted files
       - name: Package mod
         run: |
-          echo "Packaging mod: ${{ env.MOD_NAME }} v${{ env.VERSION }}"
           OUTDIR=$(find . -type d -path "*/bin/Release*" | head -n 1)
           if [ -z "$OUTDIR" ]; then
             echo "No Release output folder found" && exit 1
           fi
-          
+
           mkdir -p package/SPT/user/mods/${{ env.MOD_NAME }}
-          
-          # Copy everything except the unwanted files
-          rsync -av --exclude "*${{ env.MOD_NAME }}.deps.json" \
-                    --exclude "*${{ env.MOD_NAME }}.pdb" \
-                    --exclude "*${{ env.MOD_NAME }}.staticwebassets.endpoints.json" \
-                    "$OUTDIR"/ package/SPT/user/mods/${{ env.MOD_NAME }}/
-          
+
+          # Copy everything except deps.json, pdb, staticwebassets.endpoints.json
+          rsync -av \
+            --exclude "*${{ env.MOD_NAME }}.deps.json" \
+            --exclude "*${{ env.MOD_NAME }}.pdb" \
+            --exclude "*${{ env.MOD_NAME }}.staticwebassets.endpoints.json" \
+            "$OUTDIR"/ package/SPT/user/mods/${{ env.MOD_NAME }}/
+
           cd package
           zip -r "../${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip" .
           ls -lh ../${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip
@@ -83,6 +97,15 @@ jobs:
           name: mod_package
           path: .
 
+      # Ensure tag exists
+      - name: Create Git tag
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git tag v${{ env.VERSION }}
+          git push origin v${{ env.VERSION }}
+
+      # Check if release already exists
       - name: Check for existing release
         id: check_release
         run: |
