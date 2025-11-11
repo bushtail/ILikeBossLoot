@@ -6,14 +6,10 @@ on:
       - "v*"
   workflow_dispatch:
 
-env:
-  RELEASE_NAME: "ShelfBlacklistEditor"
-  DLL_NAME: "ShelfBlacklistEditor.dll"
-  OUTPUT_DIR: "SPT/user/mods"
-
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,18 +19,23 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
-      # Extract AUTHOR from any .cs file
+      # Extract AUTHOR from .cs file
       - name: Extract Author
         id: extract_author
         run: |
           AUTHOR=$(grep -rPo 'Author\s*\{\s*get;\s*init;\s*}\s*=\s*"\K[^"]+' . --include \*.cs | head -n 1)
-
           if [ -z "$AUTHOR" ]; then
             echo "Could not determine author"
             exit 1
           fi
-
           echo "AUTHOR=$AUTHOR" >> $GITHUB_ENV
+
+      # ✅ Auto-detect mod folder name (root folder containing your .csproj)
+      - name: Detect Mod Name
+        id: detect_modname
+        run: |
+          MOD_NAME=$(find . -maxdepth 1 -type d ! -path "." | sed 's#./##')
+          echo "MOD_NAME=$MOD_NAME" >> $GITHUB_ENV
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -44,23 +45,36 @@ jobs:
       - name: Build project
         run: dotnet build -c Release
 
+      # ✅ Auto-detect DLL name inside bin/Release/*
+      - name: Detect DLL Name
+        id: detect_dll
+        run: |
+          DLL_NAME=$(find . -type f -name "*.dll" -path "*/bin/Release/*" | head -n 1)
+          if [ -z "$DLL_NAME" ]; then
+            echo "Could not detect DLL"
+            exit 1
+          fi
+          echo "DLL_NAME=$DLL_NAME" >> $GITHUB_ENV
+
+      # Create output staging folder
       - name: Create output folder
-        run: mkdir -p $OUTPUT_DIR/$RELEASE_NAME
+        run: mkdir -p "out/${MOD_NAME}"
 
       - name: Copy DLL
         run: |
-          find . -name "$DLL_NAME" -exec cp {} $OUTPUT_DIR/$RELEASE_NAME \;
+          cp "${DLL_NAME}" "out/${MOD_NAME}/"
 
+      # ✅ Auto-name zip based on mod name + version
       - name: Zip Mod
         run: |
-          cd $OUTPUT_DIR
-          zip -r "../${RELEASE_NAME}-${VERSION}.zip" "$RELEASE_NAME"
+          cd out
+          zip -r "../${MOD_NAME}-${VERSION}.zip" "${MOD_NAME}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-zip
-          path: "${OUTPUT_DIR}/../${RELEASE_NAME}-${VERSION}.zip"
+          path: "${{ github.workspace }}/${{ env.MOD_NAME }}-${{ env.VERSION }}.zip"
 
   release:
     needs: build
@@ -76,7 +90,7 @@ jobs:
         with:
           files: "*.zip"
           tag_name: "${{ env.VERSION }}"
-          name: "${{ env.RELEASE_NAME }} ${{ env.VERSION }}"
+          name: "${{ env.MOD_NAME }} ${{ env.VERSION }}"
           draft: false
           prerelease: false
         env:
