@@ -9,72 +9,52 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+      author: ${{ steps.extract.outputs.author }}
+      name: ${{ steps.extract.outputs.name }}
+      guid: ${{ steps.extract.outputs.guid }}
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
-        
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-          
+
       - name: Extract mod metadata
+        id: extract
         run: |
           MODGUID=$(grep -rPho -h 'public\s+override\s+string\s+ModGuid\s*{[^}]*}\s*=\s*"\K[^"]+' . --include \*.cs | head -n 1)
           MOD_NAME=$(grep -rPho -h 'public\s+override\s+string\s+Name\s*{[^}]*}\s*=\s*"\K[^"]+' . --include \*.cs | head -n 1)
           AUTHOR=$(grep -rPho -h 'public\s+override\s+string\s+Author\s*{[^}]*}\s*=\s*"\K[^"]+' . --include \*.cs | head -n 1)
           VERSION=$(grep -rPo '<Version>(.*?)</Version>' **/*.csproj | sed -E 's/.*>(.*)<.*/\1/' | head -n 1)
-          
-          echo "Extracted values:"
-          echo "ModGuid: $MODGUID"
-          echo "Name: $MOD_NAME"
-          echo "Author: $AUTHOR"
-          echo "Version: $VERSION"
-          
-          if [ -z "$MOD_NAME" ] || [ -z "$AUTHOR" ] || [ -z "$VERSION" ]; then
-            echo "Missing metadata — failing early" && exit 1
-          fi
-          
-          echo "MODGUID=$MODGUID" >> $GITHUB_ENV
-          echo "MOD_NAME=$MOD_NAME" >> $GITHUB_ENV
-          echo "AUTHOR=$AUTHOR" >> $GITHUB_ENV
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-          
-      - name: Restore Dependencies
+          echo "guid=$MODGUID" >> $GITHUB_OUTPUT
+          echo "name=$MOD_NAME" >> $GITHUB_OUTPUT
+          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Restore dependencies
         run: dotnet restore
-        
-      - name: Build Project
+
+      - name: Build project
         run: dotnet build -c Release
-        
+
       - name: Package mod folder
         run: |
           OUTDIR=$(find . -type d -path "*/bin/Release*" | head -n 1)
-          if [ -z "$OUTDIR" ]; then
-            echo "No Release output folder found" && exit 1
-          fi
-
-          TARGET="package/SPT/user/mods/$AUTHOR-$MOD_NAME"
-          echo "Packaging mod into $TARGET"
+          TARGET="SPT/user/mods/${{ steps.extract.outputs.author }}-${{ steps.extract.outputs.name }}"
           mkdir -p "$TARGET"
+          rsync -av "$OUTDIR"/ "$TARGET"/ \
+            --exclude "*${{ steps.extract.outputs.name }}.pdb" \
+            --exclude "*${{ steps.extract.outputs.name }}.deps.json"
 
-          rsync -av \
-            --exclude "*$MOD_NAME.deps.json" \
-            --exclude "*$MOD_NAME.pdb" \
-            --exclude "*$MOD_NAME.staticwebassets.endpoints.json" \
-            "$OUTDIR"/ "$TARGET/"
-
-      - name: Zip mod folder
+      - name: Create final zip
         run: |
-          mkdir -p package  # ✅ Ensure package folder exists
-          cd package
-          zip -r "${AUTHOR}-${MOD_NAME}_v${VERSION}.zip" SPT
-
-      - name: Upload zipped mod
-        uses: actions/upload-artifact@v4
-        with:
-          name: mod_package
-          path: package/${{ env.AUTHOR }}-${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip      
+          ZIPNAME="${{ steps.extract.outputs.author }}-${{ steps.extract.outputs.name }}_v${{ steps.extract.outputs.version }}.zip"
+          zip -r "$ZIPNAME" SPT
           
   release:
     runs-on: ubuntu-latest
@@ -82,20 +62,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        
-      - name: Download mod artifact
-        uses: actions/download-artifact@v4
-        
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
-          files: release_artifact/*.zip
-          tag_name: "v${{ env.VERSION }}"
-          name: "${{ env.AUTHOR }}-${{ env.MOD_NAME }} v${{ env.VERSION}}"
+          files: "${{ needs.build.outputs.author }}-${{ needs.build.outputs.name }}_v${{ needs.build.outputs.version }}.zip"
+          tag_name: "v${{ needs.build.outputs.version }}"
+          name: "${{ needs.build.outputs.author }}-${{ needs.build.outputs.name }} v${{ needs.build.outputs.version }}"
           body: |
-            ModGuid: ${{ env.MODGUID }}
-            Author: ${{ env.AUTHOR }}
-            Name: ${{ env.MOD_NAME }}
-            Version: ${{ env.VERSION }}
+            ModGuid: ${{ needs.build.outputs.guid }}
+            Author: ${{ needs.build.outputs.author }}
+            Name: ${{ needs.build.outputs.name }}
+            Version: ${{ needs.build.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
