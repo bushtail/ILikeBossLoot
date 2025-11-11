@@ -42,27 +42,31 @@ jobs:
           echo "AUTHOR=$AUTHOR" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
+      - name: Debug metadata values
+        run: |
+          echo "MOD_NAME=${{ env.MOD_NAME }}"
+          echo "AUTHOR=${{ env.AUTHOR }}"
+          echo "VERSION=${{ env.VERSION }}"
+
       # Package into SPT/user/mods/<ModName>/
       - name: Package mod
         run: |
-          echo "Packaging mod: ${MOD_NAME} v${VERSION}"
-          ls -R .
+          echo "Packaging mod: ${{ env.MOD_NAME }} v${{ env.VERSION }}"
           OUTDIR=$(find . -type d -path "*/bin/Release*" | head -n 1)
           if [ -z "$OUTDIR" ]; then
             echo "No Release output folder found" && exit 1
           fi
-          mkdir -p package/SPT/user/mods/${MOD_NAME}
-          cp -r "$OUTDIR"/* package/SPT/user/mods/${MOD_NAME}/
+          mkdir -p package/SPT/user/mods/${{ env.MOD_NAME }}
+          cp -r "$OUTDIR"/* package/SPT/user/mods/${{ env.MOD_NAME }}/
           cd package
-          zip -r "../${MOD_NAME}_v${VERSION}.zip" .
-          ls -lh ../${MOD_NAME}_v${VERSION}.zip
-
+          zip -r "../${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip" .
+          ls -lh ../${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: mod_package
-          path: "${MOD_NAME}_v${VERSION}.zip"
+          path: "${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip"
 
   release:
     runs-on: ubuntu-latest
@@ -80,9 +84,9 @@ jobs:
         run: |
           RELEASE=$(curl -s \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/releases/tags/v${VERSION})
+            https://api.github.com/repos/${{ github.repository }}/releases/tags/v${{ env.VERSION }})
           if echo "$RELEASE" | grep -q '"id":'; then
-            echo "Release v${VERSION} already exists. Skipping publish."
+            echo "Release v${{ env.VERSION }} already exists. Skipping publish."
             echo "SKIP_RELEASE=true" >> $GITHUB_ENV
           else
             echo "SKIP_RELEASE=false" >> $GITHUB_ENV
@@ -92,7 +96,7 @@ jobs:
         if: env.SKIP_RELEASE == 'false'
         uses: softprops/action-gh-release@v1
         with:
-          files: "${MOD_NAME}_v${VERSION}.zip"
+          files: "${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip"
           tag_name: "v${{ env.VERSION }}"
           name: "${{ env.MOD_NAME }} v${{ env.VERSION }}"
         env:
