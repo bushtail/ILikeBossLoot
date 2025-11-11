@@ -23,38 +23,46 @@ jobs:
       - name: Build project
         run: dotnet build -c Release
 
-      # Extract mod name from DLL filename (assembly name)
-      - name: Extract mod name
+      # Extract ModGuid, Name, Author from .cs files
+      - name: Extract metadata from source
+        run: |
+          MODGUID=$(grep -rPho -h 'public\s+override\s+string\s+ModGuid\s*{[^}]*}\s*=\s*"\K[^"]+' . --include \*.cs | head -n 1)
+          NAME=$(grep -rPho -h 'public\s+override\s+string\s+Name\s*{[^}]*}\s*=\s*"\K[^"]+' . --include \*.cs | head -n 1)
+          AUTHOR=$(grep -rPho -h 'public\s+override\s+string\s+Author\s*{[^}]*}\s*=\s*"\K[^"]+' . --include \*.cs | head -n 1)
+
+          if [ -z "$NAME" ] || [ -z "$AUTHOR" ]; then
+            echo "Could not determine Name or Author" && exit 1
+          fi
+
+          echo "MODGUID=$MODGUID" >> $GITHUB_ENV
+          echo "MOD_NAME=$NAME" >> $GITHUB_ENV
+          echo "AUTHOR=$AUTHOR" >> $GITHUB_ENV
+
+          echo "Detected ModGuid: $MODGUID"
+          echo "Detected Name: $NAME"
+          echo "Detected Author: $AUTHOR"
+
+      # Extract version from assembly (Semantic Versioning)
+      - name: Extract version from assembly
         run: |
           DLL=$(find . -type f -path "*/bin/Release*/*.dll" | head -n 1)
           if [ -z "$DLL" ]; then
             echo "No DLL found in Release output" && exit 1
           fi
-          MOD_NAME=$(basename "$DLL" .dll)
-          echo "MOD_NAME=$MOD_NAME" >> $GITHUB_ENV
-          echo "Detected mod name: $MOD_NAME"
 
-      # Extract version from csproj <Version> (Semantic Versioning)
-      - name: Extract version
-        run: |
-          VERSION=$(grep -rPo '<Version>(.*?)</Version>' **/*.csproj | sed -E 's/.*>(.*)<.*/\1/' | head -n 1)
+          VERSION=$(dotnet exec --runtimeconfig "$DLL.runtimeconfig.json" --depsfile "$DLL.deps.json" "$DLL" --version 2>/dev/null || echo "")
+          if [ -z "$VERSION" ]; then
+            VERSION=$(basename "$DLL" .dll | sed -E 's/.*\.//')
+          fi
+
           if [ -z "$VERSION" ]; then
             echo "Could not determine version" && exit 1
           fi
+
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "Detected version: $VERSION"
+          echo "Detected Version: $VERSION"
 
-      # Recursively scan .cs files for Author property (capture only the quoted value)
-      - name: Extract author
-        run: |
-          AUTHOR=$(grep -rPho -h 'public\s+override\s+string\s+Author\s*{\s*get;\s*init;\s*}\s*=\s*"\K[^"]+' . --include \*.cs | head -n 1)
-          if [ -z "$AUTHOR" ]; then
-            echo "Could not determine author" && exit 1
-          fi
-          echo "AUTHOR=$AUTHOR" >> $GITHUB_ENV
-          echo "Detected author: $AUTHOR"
-
-      # Output mod folder directly (no zip)
+      # Prepare mod folder
       - name: Prepare mod folder
         run: |
           OUTDIR=$(find . -type d -path "*/bin/Release*" | head -n 1)
@@ -74,7 +82,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: v
+          name: "${{ env.AUTHOR }}-${{ env.MOD_NAME }}_v${{ env.VERSION }}"
           path: package/SPT/user/mods/${{ env.AUTHOR }}-${{ env.MOD_NAME }}/
 
   release:
@@ -87,7 +95,7 @@ jobs:
       - name: Download package artifact
         uses: actions/download-artifact@v4
         with:
-          name: v
+          name: "${{ env.AUTHOR }}-${{ env.MOD_NAME }}_v${{ env.VERSION }}"
           path: artifact
 
       - name: Check for existing release
@@ -109,7 +117,10 @@ jobs:
         with:
           files: "artifact/**"
           tag_name: "v${{ env.VERSION }}"
-          name: "v"
-          body: "Author: ${{ env.AUTHOR }}"
+          name: "${{ env.AUTHOR }}-${{ env.MOD_NAME }} v${{ env.VERSION }}"
+          body: |
+            ModGuid: ${{ env.MODGUID }}
+            Author: ${{ env.AUTHOR }}
+            Name: ${{ env.MOD_NAME }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
