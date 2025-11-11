@@ -2,7 +2,7 @@
 
 on:
   push:
-    branches: [ main ]   # runs automatically on pushes to main
+    branches: [ master ]   # runs automatically on pushes to master
 
 jobs:
   build:
@@ -66,7 +66,22 @@ jobs:
           name: mod_package
           path: .
 
+      # Check if release already exists
+      - name: Check for existing release
+        id: check_release
+        run: |
+          RELEASE=$(curl -s \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/releases/tags/v${VERSION})
+          if echo "$RELEASE" | grep -q '"id":'; then
+            echo "Release v${VERSION} already exists. Skipping publish."
+            echo "SKIP_RELEASE=true" >> $GITHUB_ENV
+          else
+            echo "SKIP_RELEASE=false" >> $GITHUB_ENV
+          fi
+
       - name: Publish GitHub Release
+        if: env.SKIP_RELEASE == 'false'
         uses: softprops/action-gh-release@v1
         with:
           files: "${MOD_NAME}_v${VERSION}.zip"
