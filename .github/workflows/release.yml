@@ -45,16 +45,17 @@ jobs:
       - name: Package mod folder
         run: |
           OUTDIR=$(find . -type d -path "*/bin/Release*" | head -n 1)
-          TARGET="SPT/user/mods/${{ steps.extract.outputs.author }}-${{ steps.extract.outputs.name }}"
+          TARGET="package/SPT/user/mods/${{ env.AUTHOR }}-${{ env.MOD_NAME }}"
           mkdir -p "$TARGET"
           rsync -av "$OUTDIR"/ "$TARGET"/ \
-            --exclude "*${{ steps.extract.outputs.name }}.pdb" \
-            --exclude "*${{ steps.extract.outputs.name }}.deps.json"
-
+            --exclude "*${{ env.MOD_NAME }}.pdb" \
+            --exclude "*${{ env.MOD_NAME }}.deps.json"
+    
       - name: Create final zip
         run: |
-          ZIPNAME="${{ steps.extract.outputs.author }}-${{ steps.extract.outputs.name }}_v${{ steps.extract.outputs.version }}.zip"
-          zip -r "$ZIPNAME" SPT
+          ZIPNAME="${{ env.AUTHOR }}-${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip"
+          cd package
+          zip -r "../$ZIPNAME" SPT
           
   release:
     runs-on: ubuntu-latest
