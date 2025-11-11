@@ -2,8 +2,8 @@
 
 on:
   push:
-    branches: [ master ]   # runs automatically on pushes to master
-  workflow_dispatch:        # allows manual trigger from Actions tab
+    branches: [ master ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -23,7 +23,7 @@ jobs:
       - name: Build project
         run: dotnet build -c Release
 
-      # Extract mod name from DLL filename
+      # Extract mod name from DLL filename (assembly name)
       - name: Extract mod name
         run: |
           DLL=$(find . -type f -path "*/bin/Release*/*.dll" | head -n 1)
@@ -34,7 +34,7 @@ jobs:
           echo "MOD_NAME=$MOD_NAME" >> $GITHUB_ENV
           echo "Detected mod name: $MOD_NAME"
 
-      # Extract version from assembly informational version or csproj
+      # Extract version from csproj <Version>
       - name: Extract version
         run: |
           VERSION=$(grep -Po '<Version>(.*?)</Version>' **/*.csproj | sed -E 's/.*>(.*)<.*/\1/' | head -n 1)
@@ -44,6 +44,17 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Detected version: $VERSION"
 
+      # Recursively scan .cs files for Author property
+      - name: Extract author
+        run: |
+          AUTHOR=$(grep -rPo 'public\s+override\s+string\s+Author\s*{[^}]*}\s*=\s*"(.*?)"' . --include \*.cs \
+            | sed -E 's/.*="(.*)".*/\1/' | head -n 1)
+          if [ -z "$AUTHOR" ]; then
+            echo "Could not determine author" && exit 1
+          fi
+          echo "AUTHOR=$AUTHOR" >> $GITHUB_ENV
+          echo "Detected author: $AUTHOR"
+
       # Package mod, excluding unwanted files
       - name: Package mod
         run: |
@@ -52,14 +63,13 @@ jobs:
             echo "No Release output folder found" && exit 1
           fi
 
-          mkdir -p package/SPT/user/mods/${{ env.MOD_NAME }}
+          mkdir -p package/SPT/user/mods/${{ env.AUTHOR }}-${{ env.MOD_NAME }}
 
-          # Copy everything except deps.json, pdb, staticwebassets.endpoints.json
           rsync -av \
             --exclude "*${{ env.MOD_NAME }}.deps.json" \
             --exclude "*${{ env.MOD_NAME }}.pdb" \
             --exclude "*${{ env.MOD_NAME }}.staticwebassets.endpoints.json" \
-            "$OUTDIR"/ package/SPT/user/mods/${{ env.MOD_NAME }}/
+            "$OUTDIR"/ package/SPT/user/mods/${{ env.AUTHOR }}-${{ env.MOD_NAME }}/
 
           cd package
           zip -r "../${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip" .
@@ -75,21 +85,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download package artifact
         uses: actions/download-artifact@v4
         with:
           name: mod_package
           path: .
 
-      # Ensure tag exists
-      - name: Create Git tag
-        run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-          git tag v${{ env.VERSION }}
-          git push origin v${{ env.VERSION }}
-
-      # Check if release already exists
       - name: Check for existing release
         id: check_release
         run: |
@@ -110,5 +114,6 @@ jobs:
           files: "${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip"
           tag_name: "v${{ env.VERSION }}"
           name: "${{ env.MOD_NAME }} v${{ env.VERSION }}"
+          body: "Author: ${{ env.AUTHOR }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
