@@ -45,8 +45,26 @@ jobs:
       - name: Build Project
         run: dotnet build -c Release
         
+      - name: Package mod folder
+        run: |
+          OUTDIR=$(find . -type d -path "*/bin/Release*" | head -n 1)
+          if [ -z "$OUTDIR" ]; then
+            echo "No Release output folder found" && exit 1
+          fi
+
+          TARGET="package/SPT/user/mods/$AUTHOR-$MOD_NAME"
+          echo "Packaging mod into $TARGET"
+          mkdir -p "$TARGET"
+
+          rsync -av \
+            --exclude "*$MOD_NAME.deps.json" \
+            --exclude "*$MOD_NAME.pdb" \
+            --exclude "*$MOD_NAME.staticwebassets.endpoints.json" \
+            "$OUTDIR"/ "$TARGET/"
+
       - name: Zip mod folder
         run: |
+          mkdir -p package  # ✅ Ensure package folder exists
           cd package
           zip -r "${AUTHOR}-${MOD_NAME}_v${VERSION}.zip" SPT
 
