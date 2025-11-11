@@ -54,8 +54,15 @@ jobs:
           if [ -z "$OUTDIR" ]; then
             echo "No Release output folder found" && exit 1
           fi
+          
           mkdir -p package/SPT/user/mods/${{ env.MOD_NAME }}
-          cp -r "$OUTDIR"/* package/SPT/user/mods/${{ env.MOD_NAME }}/
+          
+          # Copy everything except the unwanted files
+          rsync -av --exclude "*${{ env.MOD_NAME }}.deps.json" \
+                    --exclude "*${{ env.MOD_NAME }}.pdb" \
+                    --exclude "*${{ env.MOD_NAME }}.staticwebassets.endpoints.json" \
+                    "$OUTDIR"/ package/SPT/user/mods/${{ env.MOD_NAME }}/
+          
           cd package
           zip -r "../${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip" .
           ls -lh ../${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip
