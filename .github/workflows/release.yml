@@ -45,25 +45,25 @@ jobs:
         id: extract_version
         run: |
           VERSION=$(grep -rPo '<Version>(.*?)</Version>' **/*.csproj \
-            | sed -E 's/.*>(.*)<.*/\1/' | head -n 1)
+          | sed -E 's/.*>(.*)<.*/\1/' | head -n 1)
           if [ -z "$VERSION" ]; then
             echo "Could not determine version" && exit 1
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected version: $VERSION"
 
-      # Extract author property
+      # Extract author from .cs property
       - name: Extract author
         id: extract_author
         run: |
-          AUTHOR=$(grep -rPo 'public\s+override\s+string\s+Author\s*{\s*get;\s*init;\s*}\s*=\s*"(.*?)"' . --include \*.cs \
-            | sed -E 's/.*="(.*)".*/\1/' | head -n 1)
+          AUTHOR=$(grep -rPo '(?<=Author\s*{\s*get;\s*init;\s*}\s*=\s*")[^"]+' . --include \*.cs | head -n 1)
           if [ -z "$AUTHOR" ]; then
             echo "Could not determine author" && exit 1
           fi
           echo "AUTHOR=$AUTHOR" >> $GITHUB_OUTPUT
           echo "Detected author: $AUTHOR"
 
+      # Package mod for SPT
       - name: Package mod
         run: |
           MOD_NAME="${{ steps.extract_mod_name.outputs.MOD_NAME }}"
@@ -92,6 +92,7 @@ jobs:
           name: mod_package
           path: "${{ steps.extract_mod_name.outputs.MOD_NAME }}_v${{ steps.extract_version.outputs.VERSION }}.zip"
 
+
   release:
     runs-on: ubuntu-latest
     needs: build
@@ -111,7 +112,7 @@ jobs:
         with:
           files: "${{ needs.build.outputs.MOD_NAME }}_v${{ needs.build.outputs.VERSION }}.zip"
           tag_name: "v${{ needs.build.outputs.VERSION }}"
-          name: "${{ needs.build.outputs.MOD_NAME }} v${{ needs.build.outputs.VERSION }}"
-          body: "Author: ${{ needs.build.outputs.AUTHOR }}"
+          name: "v${{ needs.build.outputs.VERSION }}"
+          body: "${{ needs.build.outputs.MOD_NAME }} by ${{ needs.build.outputs.AUTHOR }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
