@@ -45,10 +45,18 @@ jobs:
       # Package into SPT/user/mods/<ModName>/
       - name: Package mod
         run: |
+          echo "Packaging mod: ${MOD_NAME} v${VERSION}"
+          ls -R .
+          OUTDIR=$(find . -type d -path "*/bin/Release*" | head -n 1)
+          if [ -z "$OUTDIR" ]; then
+            echo "No Release output folder found" && exit 1
+          fi
           mkdir -p package/SPT/user/mods/${MOD_NAME}
-          cp -r $(find . -path "*/bin/Release/*" -type d | head -n 1)/* package/SPT/user/mods/${MOD_NAME}/
+          cp -r "$OUTDIR"/* package/SPT/user/mods/${MOD_NAME}/
           cd package
           zip -r "../${MOD_NAME}_v${VERSION}.zip" .
+          ls -lh ../${MOD_NAME}_v${VERSION}.zip
+
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
