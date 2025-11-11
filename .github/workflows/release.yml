@@ -2,7 +2,7 @@
 
 on:
   push:
-    branches: [ master ]   # runs automatically on pushes to master
+    branches: [ master ]
 
 jobs:
   build:
@@ -22,7 +22,6 @@ jobs:
       - name: Build project
         run: dotnet build -c Release
 
-      # Find the .cs file containing a class OR record that extends AbstractModMetadata
       - name: Locate metadata type file
         run: |
           FILE=$(grep -rlE "(class|record)\s+\w+\s*:\s*AbstractModMetadata" . --include \*.cs | head -n 1)
@@ -31,24 +30,23 @@ jobs:
           fi
           echo "METADATA_FILE=$FILE" >> $GITHUB_ENV
 
-      # Extract Name, Author, Version from that type block
       - name: Extract metadata values
         run: |
           NAME=$(grep -Po 'Name\s*=>\s*"(.*?)"' "$METADATA_FILE" | sed -E 's/.*"(.*)".*/\1/' | head -n 1)
           AUTHOR=$(grep -Po 'Author\s*=>\s*"(.*?)"' "$METADATA_FILE" | sed -E 's/.*"(.*)".*/\1/' | head -n 1)
-          VERSION=$(grep -Po 'Version\s*=>\s*new\s*Version\s*\(\s*([0-9]+\.[0-9]+\.[0-9]+)\s*\)' "$METADATA_FILE" | sed -E 's/.*([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -n 1)
-
+          VERSION=$(grep -Po 'Version\s*=>\s*new\s*(Version)?\s*\(\s*([0-9]+\s*,\s*[0-9]+\s*,\s*[0-9]+)\s*\)' "$METADATA_FILE" \
+            | sed -E 's/.*\(([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\).*/\1.\2.\3/' | head -n 1)
+          
           echo "MOD_NAME=$NAME" >> $GITHUB_ENV
           echo "AUTHOR=$AUTHOR" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-
+          
       - name: Debug metadata values
         run: |
           echo "MOD_NAME=${{ env.MOD_NAME }}"
           echo "AUTHOR=${{ env.AUTHOR }}"
           echo "VERSION=${{ env.VERSION }}"
 
-      # Package into SPT/user/mods/<ModName>/
       - name: Package mod
         run: |
           echo "Packaging mod: ${{ env.MOD_NAME }} v${{ env.VERSION }}"
@@ -78,7 +76,6 @@ jobs:
           name: mod_package
           path: .
 
-      # Check if release already exists
       - name: Check for existing release
         id: check_release
         run: |
