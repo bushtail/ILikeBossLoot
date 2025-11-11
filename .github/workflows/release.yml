@@ -48,7 +48,7 @@ jobs:
       - name: Extract author
         run: |
           AUTHOR=$(grep -rPo 'public\s+override\s+string\s+Author\s*{\s*get;\s*init;\s*}\s*=\s*"(.*?)"' . --include \*.cs \
-            | sed -E 's/.*="(.*)".*/\1/' | head -n 1)
+            | sed -E 's/.*="([^"]+)".*/\1/' | head -n 1)
           if [ -z "$AUTHOR" ]; then
             echo "Could not determine author" && exit 1
           fi
