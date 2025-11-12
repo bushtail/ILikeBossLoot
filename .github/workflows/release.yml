@@ -84,7 +84,7 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: release_artifact/mod_package/*.zip
+          files: mod_package/*.zip
           tag_name: "v${{ env.VERSION }}"
           name: "${{ env.AUTHOR }}-${{ env.MOD_NAME }} v${{ env.VERSION}}"
           body: |
