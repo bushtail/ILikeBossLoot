@@ -90,12 +90,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: mod_package/*.zip
-          tag_name: "v${{ steps.extract.outputs.VERSION }}"
-          name: "${{ steps.extract.outputs.AUTHOR }}-${{ steps.extract.outputs.MOD_NAME }} v${{ steps.extract.outputs.VERSION}}"
+          tag_name: "v${{ env.VERSION }}"
+          name: "${{ env.AUTHOR }}-${{ env.MOD_NAME }} v${{ env.VERSION}}"
           body: |
-            ModGuid: ${{ steps.extract.outputs.MODGUID }}
-            Author: ${{ steps.extract.outputs.AUTHOR }}
-            Name: ${{ steps.extract.outputs.MOD_NAME }}
-            Version: ${{ steps.extract.outputs.VERSION }}
+            ModGuid: ${{ env.MODGUID }}
+            Author: ${{ env.AUTHOR }}
+            Name: ${{ env.MOD_NAME }}
+            Version: ${{ env.VERSION }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
