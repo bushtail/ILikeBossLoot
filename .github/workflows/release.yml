@@ -83,6 +83,7 @@ jobs:
 
       - name: list mod artifact
         run: |
+          cd mod_package
           ls
 
       - name: Publish release
