@@ -9,6 +9,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      modguid: ${{ steps.extract.outputs.modguid }}
+      modname: ${{ steps.extract.outputs.modname }}
+      author: ${{ steps.extract.outputs.author }}
+      version: ${{ steps.extract.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,13 +41,9 @@ jobs:
             echo "Missing metadata — failing early" && exit 1
           fi
           
-          echo "MODGUID=$MODGUID" >> $GITHUB_ENV
           echo "MODGUID=$MODGUID" >> $GITHUB_OUTPUT
-          echo "MOD_NAME=$MOD_NAME" >> $GITHUB_ENV
           echo "MOD_NAME=$MOD_NAME" >> $GITHUB_OUTPUT
-          echo "AUTHOR=$AUTHOR" >> $GITHUB_ENV
           echo "AUTHOR=$AUTHOR" >> $GITHUB_OUTPUT
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Restore Dependencies
@@ -74,7 +75,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mod_package
-          path: package/${{ env.AUTHOR }}-${{ env.MOD_NAME }}_v${{ env.VERSION }}.zip
+          path: package/${{ steps.extract.outputs.author }}-${{ steps.extract.outputs.modname }}_v${{ steps.extract.outputs.version }}.zip
   
   release:
     runs-on: ubuntu-latest
@@ -90,12 +91,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: mod_package/*.zip
-          tag_name: "v${{ env.VERSION }}"
-          name: "${{ env.AUTHOR }}-${{ env.MOD_NAME }} v${{ env.VERSION}}"
+          tag_name: "v${{ steps.extract.outputs.version }}"
+          name: "${{ steps.extract.outputs.author }}-${{ steps.extract.outputs.modname }} v${{ steps.extract.outputs.version}}"
           body: |
-            ModGuid: ${{ env.MODGUID }}
-            Author: ${{ env.AUTHOR }}
-            Name: ${{ env.MOD_NAME }}
-            Version: ${{ env.VERSION }}
+            ModGuid: ${{ steps.extract.outputs.modguid }}
+            Author: ${{ steps.extract.outputs.author }}
+            Name: ${{ steps.extract.outputs.modname }}
+            Version: ${{ steps.extract.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
