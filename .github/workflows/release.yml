@@ -19,6 +19,7 @@ jobs:
           dotnet-version: '9.0.x'
 
       - name: Extract mod metadata
+        id: extract
         run: |
           MODGUID=$(grep -rPho -h 'public\s+override\s+string\s+ModGuid\s*{[^}]*}\s*=\s*"\K[^"]+' . --include \*.cs | head -n 1)
           MOD_NAME=$(grep -rPho -h 'public\s+override\s+string\s+Name\s*{[^}]*}\s*=\s*"\K[^"]+' . --include \*.cs | head -n 1)
@@ -36,9 +37,13 @@ jobs:
           fi
           
           echo "MODGUID=$MODGUID" >> $GITHUB_ENV
+          echo "MODGUID=$MODGUID" >> $GITHUB_OUTPUT
           echo "MOD_NAME=$MOD_NAME" >> $GITHUB_ENV
+          echo "MOD_NAME=$MOD_NAME" >> $GITHUB_OUTPUT
           echo "AUTHOR=$AUTHOR" >> $GITHUB_ENV
+          echo "AUTHOR=$AUTHOR" >> $GITHUB_OUTPUT
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Restore Dependencies
         run: dotnet restore
@@ -85,12 +90,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: mod_package/*.zip
-          tag_name: "v${{ env.VERSION }}"
-          name: "${{ env.AUTHOR }}-${{ env.MOD_NAME }} v${{ env.VERSION}}"
+          tag_name: "v${{ steps.extract.outputs.VERSION }}"
+          name: "${{ steps.extract.outputs.AUTHOR }}-${{ steps.extract.outputs.MOD_NAME }} v${{ steps.extract.outputs.VERSION}}"
           body: |
-            ModGuid: ${{ env.MODGUID }}
-            Author: ${{ env.AUTHOR }}
-            Name: ${{ env.MOD_NAME }}
-            Version: ${{ env.VERSION }}
+            ModGuid: ${{ steps.extract.outputs.MODGUID }}
+            Author: ${{ steps.extract.outputs.AUTHOR }}
+            Name: ${{ steps.extract.outputs.MOD_NAME }}
+            Version: ${{ steps.extract.outputs.VERSION }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
