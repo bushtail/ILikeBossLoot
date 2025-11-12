@@ -105,7 +105,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: mod_package/*.zip
-          tag_name: "v${{ env.TAGNAME }}"
+          tag_name: "${{ env.TAGNAME }}"
           name: "${{ env.ZIPNAME }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
