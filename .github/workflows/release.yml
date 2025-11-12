@@ -52,6 +52,7 @@ jobs:
           if [ -z "$OUTDIR" ]; then
             echo "No Release output folder found" && exit 1
           fi
+          INNER=$(find "$OUTDIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)
           TARGET="package/SPT/user/mods/$AUTHOR-$MOD_NAME"
           echo "Packaging mod into $TARGET"
           mkdir -p "$TARGET"
@@ -59,19 +60,7 @@ jobs:
             --exclude "*$MOD_NAME.deps.json" \
             --exclude "*$MOD_NAME.pdb" \
             --exclude "*$MOD_NAME.staticwebassets.endpoints.json" \
-            "$OUTDIR"/ "$TARGET/"
-          
-      - name: Optionally include bundles folder
-        run: |
-          BUNDLES_DIR=$(find . -type d -name bundles | head -n 1)
-          BUNDLES_JSON=$(find . -type f -name bundles.json | head -n 1)
-          if [ -n "$BUNDLES_DIR" ] && [ -n "$BUNDLES_JSON" ]; then
-            echo "Found both bundles/ and bundles.json — including them in package"
-            rsync -av "$BUNDLES_DIR" "$TARGET/"
-            cp "$BUNDLES_JSON" "$TARGET/"
-          else
-            echo "Skipping: bundles/ and bundles.json must both exist"
-          fi
+            "$INNER"/ "$TARGET/"
           
       - name: Zip mod folder
         run: |
