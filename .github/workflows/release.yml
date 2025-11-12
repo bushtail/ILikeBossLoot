@@ -81,9 +81,9 @@ jobs:
       - name: Download mod artifact
         uses: actions/download-artifact@v4
 
-      - name: Unzip mod artifact
+      - name: list mod artifact
         run: |
-          unzip mod_package.zip -d release_artifact/unpacked
+          ls
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
