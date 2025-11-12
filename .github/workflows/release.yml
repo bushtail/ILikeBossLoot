@@ -37,13 +37,9 @@ jobs:
           fi
           
           echo "MODGUID=$MODGUID" >> $GITHUB_ENV
-          echo "MODGUID=$MODGUID" >> $GITHUB_OUTPUT
           echo "MOD_NAME=$MOD_NAME" >> $GITHUB_ENV
-          echo "MOD_NAME=$MOD_NAME" >> $GITHUB_OUTPUT
           echo "AUTHOR=$AUTHOR" >> $GITHUB_ENV
-          echo "AUTHOR=$AUTHOR" >> $GITHUB_OUTPUT
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
       - name: Restore Dependencies
         run: dotnet restore
 
@@ -55,7 +51,7 @@ jobs:
           BUNDLES_DIR=$(find . -type d -name bundles | head -n 1)
           BUNDLES_JSON=$(find . -type f -name bundles.json | head -n 1)
           if [ -n "$BUNDLES_DIR" ] && [ -n "$BUNDLES_JSON" ]; then
-            echo "Found both bundles folder and bundles json, including them in package...
+            echo "Found both bundles folder and bundles json, including them in package..."
             cp -4 "$BUNDLES_DIR" package/
             cp "$BUNDLES_JSON" package.
           else
@@ -64,7 +60,7 @@ jobs:
     
       - name: Zip mod folder
         run: |
-          mkdir -p package  # ✅ Ensure package folder exists
+          mkdir -p package
           cd package
           zip -r "${AUTHOR}-${MOD_NAME}_v${VERSION}.zip" SPT
           
