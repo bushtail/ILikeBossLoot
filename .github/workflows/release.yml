@@ -83,7 +83,7 @@ jobs:
 
       - name: Unzip mod artifact
         run: |
-          unzip release_artifact/mod_package.zip -d release_artifact/unpacked
+          unzip mod_package.zip -d release_artifact/unpacked
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
